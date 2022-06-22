@@ -55,7 +55,7 @@ func TestCreateFleetAndGameServerAllocate(t *testing.T) {
 				defer fleets.Delete(ctx, flt.ObjectMeta.Name, metav1.DeleteOptions{}) // nolint:errcheck
 			}
 
-			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 			gsaList := []*allocationv1.GameServerAllocation{
 				{Spec: allocationv1.GameServerAllocationSpec{
@@ -92,7 +92,7 @@ func TestCreateFleetAndGameServerStateFilterAllocation(t *testing.T) {
 	require.NoError(t, err)
 	defer fleets.Delete(ctx, flt.ObjectMeta.Name, metav1.DeleteOptions{}) // nolint:errcheck
 
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 	fleetSelector := metav1.LabelSelector{MatchLabels: map[string]string{agonesv1.FleetNameLabel: flt.ObjectMeta.Name}}
 	gsa := &allocationv1.GameServerAllocation{
@@ -147,7 +147,7 @@ func TestHighDensityGameServerFlow(t *testing.T) {
 	require.NoError(t, err)
 	defer fleets.Delete(ctx, flt.ObjectMeta.Name, metav1.DeleteOptions{}) // nolint:errcheck
 
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 	fleetSelector := metav1.LabelSelector{MatchLabels: map[string]string{agonesv1.FleetNameLabel: flt.ObjectMeta.Name}}
 	allocatedSelector := fleetSelector.DeepCopy()
@@ -217,7 +217,7 @@ func TestCreateFleetAndGameServerPlayerCapacityAllocation(t *testing.T) {
 	require.NoError(t, err)
 	defer fleets.Delete(ctx, flt.ObjectMeta.Name, metav1.DeleteOptions{}) // nolint:errcheck
 
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 	fleetSelector := metav1.LabelSelector{MatchLabels: map[string]string{agonesv1.FleetNameLabel: flt.ObjectMeta.Name}}
 	allocated := agonesv1.GameServerStateAllocated
@@ -290,7 +290,7 @@ func TestMultiClusterAllocationOnLocalCluster(t *testing.T) {
 				defer fleets.Delete(ctx, flt.ObjectMeta.Name, metav1.DeleteOptions{}) // nolint:errcheck
 			}
 
-			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 			// Allocation Policy #1: local cluster with desired label.
 			// This policy allocates locally on the cluster due to matching namespace with gsa and not setting AllocationEndpoints.
@@ -417,7 +417,7 @@ func TestCreateFullFleetAndCantGameServerAllocate(t *testing.T) {
 				defer fleets.Delete(ctx, flt.ObjectMeta.Name, metav1.DeleteOptions{}) // nolint:errcheck
 			}
 
-			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 			gsa := &allocationv1.GameServerAllocation{
 				Spec: allocationv1.GameServerAllocationSpec{
@@ -435,7 +435,7 @@ func TestCreateFullFleetAndCantGameServerAllocate(t *testing.T) {
 
 			framework.AssertFleetCondition(t, flt, func(log *logrus.Entry, fleet *agonesv1.Fleet) bool {
 				return fleet.Status.AllocatedReplicas == replicasCount
-			})
+			}, e2e.DefaultFleetConditionTimeout)
 
 			gsa, err = framework.AgonesClient.AllocationV1().GameServerAllocations(framework.Namespace).Create(ctx, gsa.DeepCopy(), metav1.CreateOptions{})
 			if assert.Nil(t, err) {
@@ -536,8 +536,8 @@ func TestGameServerAllocationPreferredSelection(t *testing.T) {
 		assert.FailNow(t, "could not create second fleet")
 	}
 
-	framework.AssertFleetCondition(t, preferred, e2e.FleetReadyCount(preferred.Spec.Replicas))
-	framework.AssertFleetCondition(t, required, e2e.FleetReadyCount(required.Spec.Replicas))
+	framework.AssertFleetCondition(t, preferred, e2e.FleetReadyCount(preferred.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
+	framework.AssertFleetCondition(t, required, e2e.FleetReadyCount(required.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 	gsa := &allocationv1.GameServerAllocation{ObjectMeta: metav1.ObjectMeta{GenerateName: "allocation-"},
 		Spec: allocationv1.GameServerAllocationSpec{
@@ -587,7 +587,7 @@ func TestGameServerAllocationPreferredSelection(t *testing.T) {
 	assert.Nil(t, err)
 
 	// now wait for another one to come along
-	framework.AssertFleetCondition(t, preferred, e2e.FleetReadyCount(preferred.Spec.Replicas))
+	framework.AssertFleetCondition(t, preferred, e2e.FleetReadyCount(preferred.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 	gsa3, err := framework.AgonesClient.AllocationV1().GameServerAllocations(framework.Namespace).Create(ctx, gsa.DeepCopy(), metav1.CreateOptions{})
 	if assert.Nil(t, err) {
@@ -633,7 +633,7 @@ func TestGameServerAllocationDuringMultipleAllocationClients(t *testing.T) {
 		assert.FailNow(t, "could not create first fleet")
 	}
 
-	framework.AssertFleetCondition(t, preferred, e2e.FleetReadyCount(preferred.Spec.Replicas))
+	framework.AssertFleetCondition(t, preferred, e2e.FleetReadyCount(preferred.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 	// scale down before starting allocation
 	preferred = scaleFleetPatch(ctx, t, preferred, preferred.Spec.Replicas-20)

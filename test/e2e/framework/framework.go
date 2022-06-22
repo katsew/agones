@@ -60,6 +60,11 @@ import (
 const (
 	AutoCleanupLabelKey   = "agones.dev/e2e-test-auto-cleanup"
 	AutoCleanupLabelValue = "true"
+
+	DefaultFleetConditionTimeout               = 5 * time.Minute
+	DefaultFleetAutoScalerConditionTimeout     = 2 * time.Minute
+	DefaultFleetGameServersConditionTimeout    = 5 * time.Minute
+	DefaultFleetGameServerListConditionTimeout = 5 * time.Minute
 )
 
 // NamespaceLabel is the label that is put on all namespaces that are created
@@ -306,16 +311,16 @@ func (f *Framework) CycleAllocations(ctx context.Context, t *testing.T, flt *ago
 }
 
 // AssertFleetCondition waits for the Fleet to be in a specific condition or fails the test if the condition can't be met in 5 minutes.
-func (f *Framework) AssertFleetCondition(t *testing.T, flt *agonesv1.Fleet, condition func(*logrus.Entry, *agonesv1.Fleet) bool) {
-	err := f.WaitForFleetCondition(t, flt, condition)
+func (f *Framework) AssertFleetCondition(t *testing.T, flt *agonesv1.Fleet, condition func(*logrus.Entry, *agonesv1.Fleet) bool, timeout time.Duration) {
+	err := f.WaitForFleetCondition(t, flt, condition, timeout)
 	require.NoError(t, err, "error waiting for fleet condition on fleet: %v", flt.Name)
 }
 
 // WaitForFleetCondition waits for the Fleet to be in a specific condition or returns an error if the condition can't be met in 5 minutes.
-func (f *Framework) WaitForFleetCondition(t *testing.T, flt *agonesv1.Fleet, condition func(*logrus.Entry, *agonesv1.Fleet) bool) error {
+func (f *Framework) WaitForFleetCondition(t *testing.T, flt *agonesv1.Fleet, condition func(*logrus.Entry, *agonesv1.Fleet) bool, timeout time.Duration) error {
 	log := TestLogger(t).WithField("fleet", flt.Name)
 	log.Info("waiting for fleet condition")
-	err := wait.PollImmediate(2*time.Second, 5*time.Minute, func() (bool, error) {
+	err := wait.PollImmediate(2*time.Second, timeout, func() (bool, error) {
 		fleet, err := f.AgonesClient.AgonesV1().Fleets(flt.ObjectMeta.Namespace).Get(context.Background(), flt.ObjectMeta.Name, metav1.GetOptions{})
 		if err != nil {
 			return true, err
@@ -348,10 +353,10 @@ func (f *Framework) WaitForFleetCondition(t *testing.T, flt *agonesv1.Fleet, con
 
 // WaitForFleetAutoScalerCondition waits for the FleetAutoscaler to be in a specific condition or fails the test if the condition can't be met in 2 minutes.
 // nolint: dupl
-func (f *Framework) WaitForFleetAutoScalerCondition(t *testing.T, fas *autoscaling.FleetAutoscaler, condition func(log *logrus.Entry, fas *autoscaling.FleetAutoscaler) bool) {
+func (f *Framework) WaitForFleetAutoScalerCondition(t *testing.T, fas *autoscaling.FleetAutoscaler, condition func(log *logrus.Entry, fas *autoscaling.FleetAutoscaler) bool, timeout time.Duration) {
 	log := TestLogger(t).WithField("fleetautoscaler", fas.Name)
 	log.Info("waiting for fleetautoscaler condition")
-	err := wait.PollImmediate(2*time.Second, 2*time.Minute, func() (bool, error) {
+	err := wait.PollImmediate(2*time.Second, timeout, func() (bool, error) {
 		fleetautoscaler, err := f.AgonesClient.AutoscalingV1().FleetAutoscalers(fas.ObjectMeta.Namespace).Get(context.Background(), fas.ObjectMeta.Name, metav1.GetOptions{})
 		if err != nil {
 			return true, err
@@ -397,7 +402,7 @@ func FleetReadyCount(amount int32) func(*logrus.Entry, *agonesv1.Fleet) bool {
 // WaitForFleetGameServersCondition waits for all GameServers for a given fleet to match
 // a condition specified by a callback.
 func (f *Framework) WaitForFleetGameServersCondition(flt *agonesv1.Fleet,
-	cond func(server *agonesv1.GameServer) bool) error {
+	cond func(server *agonesv1.GameServer) bool, timeout time.Duration) error {
 	return f.WaitForFleetGameServerListCondition(flt,
 		func(servers []agonesv1.GameServer) bool {
 			for i := range servers {
@@ -407,14 +412,14 @@ func (f *Framework) WaitForFleetGameServersCondition(flt *agonesv1.Fleet,
 				}
 			}
 			return true
-		})
+		}, timeout)
 }
 
 // WaitForFleetGameServerListCondition waits for the list of GameServers to match a condition
 // specified by a callback and the size of GameServers to match fleet's Spec.Replicas.
 func (f *Framework) WaitForFleetGameServerListCondition(flt *agonesv1.Fleet,
-	cond func(servers []agonesv1.GameServer) bool) error {
-	return wait.Poll(2*time.Second, 5*time.Minute, func() (done bool, err error) {
+	cond func(servers []agonesv1.GameServer) bool, timeout time.Duration) error {
+	return wait.Poll(2*time.Second, timeout, func() (done bool, err error) {
 		gsList, err := f.ListGameServersFromFleet(flt)
 		if err != nil {
 			return false, err

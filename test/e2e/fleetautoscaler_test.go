@@ -59,7 +59,7 @@ func TestAutoscalerBasicFunctions(t *testing.T) {
 		defer fleets.Delete(ctx, flt.ObjectMeta.Name, metav1.DeleteOptions{}) // nolint:errcheck
 	}
 
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), 5*time.Minute)
 
 	fleetautoscalers := framework.AgonesClient.AutoscalingV1().FleetAutoscalers(framework.Namespace)
 	defaultFas := defaultFleetAutoscaler(flt, framework.Namespace)
@@ -74,36 +74,36 @@ func TestAutoscalerBasicFunctions(t *testing.T) {
 
 	// the fleet autoscaler should scale the fleet up now up to BufferSize
 	bufferSize := int32(fas.Spec.Policy.Buffer.BufferSize.IntValue())
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(bufferSize))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(bufferSize), e2e.DefaultFleetConditionTimeout)
 
 	// patch the autoscaler to increase MinReplicas and watch the fleet scale up
 	fas, err = patchFleetAutoscaler(ctx, fas, intstr.FromInt(int(bufferSize)), bufferSize+2, fas.Spec.Policy.Buffer.MaxReplicas)
 	assert.Nil(t, err, "could not patch fleetautoscaler")
 
 	// min replicas is now higher than buffer size, will scale to that level
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(fas.Spec.Policy.Buffer.MinReplicas))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(fas.Spec.Policy.Buffer.MinReplicas), e2e.DefaultFleetConditionTimeout)
 
 	// patch the autoscaler to remove MinReplicas and watch the fleet scale down to bufferSize
 	fas, err = patchFleetAutoscaler(ctx, fas, intstr.FromInt(int(bufferSize)), 0, fas.Spec.Policy.Buffer.MaxReplicas)
 	assert.Nil(t, err, "could not patch fleetautoscaler")
 
 	bufferSize = int32(fas.Spec.Policy.Buffer.BufferSize.IntValue())
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(bufferSize))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(bufferSize), e2e.DefaultFleetConditionTimeout)
 
 	// do an allocation and watch the fleet scale up
 	gsa := framework.CreateAndApplyAllocation(t, flt)
 	framework.AssertFleetCondition(t, flt, func(log *logrus.Entry, fleet *agonesv1.Fleet) bool {
 		return fleet.Status.AllocatedReplicas == 1
-	})
+	}, e2e.DefaultFleetConditionTimeout)
 
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(bufferSize))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(bufferSize), e2e.DefaultFleetConditionTimeout)
 
 	// patch autoscaler to switch to relative buffer size and check if the fleet adjusts
 	_, err = patchFleetAutoscaler(ctx, fas, intstr.FromString("10%"), 1, fas.Spec.Policy.Buffer.MaxReplicas)
 	require.NoError(t, err, "could not patch fleetautoscaler")
 
 	// 10% with only one allocated GS means only one ready server
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(1))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(1), e2e.DefaultFleetConditionTimeout)
 
 	// get the Status of the fleetautoscaler
 	fas, err = framework.AgonesClient.AutoscalingV1().FleetAutoscalers(fas.ObjectMeta.Namespace).Get(ctx, fas.Name, metav1.GetOptions{})
@@ -113,7 +113,7 @@ func TestAutoscalerBasicFunctions(t *testing.T) {
 	// check that we are able to scale
 	framework.WaitForFleetAutoScalerCondition(t, fas, func(log *logrus.Entry, fas *autoscalingv1.FleetAutoscaler) bool {
 		return !fas.Status.ScalingLimited
-	})
+	}, e2e.DefaultFleetAutoScalerConditionTimeout)
 
 	// patch autoscaler to a maxReplicas count equal to current replicas count
 	_, err = patchFleetAutoscaler(ctx, fas, intstr.FromInt(1), 1, 1)
@@ -122,7 +122,7 @@ func TestAutoscalerBasicFunctions(t *testing.T) {
 	// check that we are not able to scale
 	framework.WaitForFleetAutoScalerCondition(t, fas, func(log *logrus.Entry, fas *autoscalingv1.FleetAutoscaler) bool {
 		return fas.Status.ScalingLimited
-	})
+	}, e2e.DefaultFleetAutoScalerConditionTimeout)
 
 	// delete the allocated GameServer and watch the fleet scale down
 	gp := int64(1)
@@ -132,7 +132,7 @@ func TestAutoscalerBasicFunctions(t *testing.T) {
 		return fleet.Status.AllocatedReplicas == 0 &&
 			fleet.Status.ReadyReplicas == 1 &&
 			fleet.Status.Replicas == 1
-	})
+	}, e2e.DefaultFleetConditionTimeout)
 }
 
 func TestFleetAutoscalerDefaultSyncInterval(t *testing.T) {
@@ -146,7 +146,7 @@ func TestFleetAutoscalerDefaultSyncInterval(t *testing.T) {
 		defer fleets.Delete(ctx, flt.ObjectMeta.Name, metav1.DeleteOptions{}) // nolint:errcheck
 	}
 
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 	fleetautoscalers := framework.AgonesClient.AutoscalingV1().FleetAutoscalers(framework.Namespace)
 	dummyFleetName := "dummy-fleet"
@@ -207,7 +207,7 @@ func TestFleetAutoScalerRollingUpdate(t *testing.T) {
 		defer fleets.Delete(ctx, flt.ObjectMeta.Name, metav1.DeleteOptions{}) // nolint:errcheck
 	}
 
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 	fleetautoscalers := framework.AgonesClient.AutoscalingV1().FleetAutoscalers(framework.Namespace)
 
@@ -224,7 +224,7 @@ func TestFleetAutoScalerRollingUpdate(t *testing.T) {
 		logrus.Error("Failed creating autoscaler, aborting TestAutoscalerBasicFunctions")
 		return
 	}
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(int32(targetScale)))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(int32(targetScale)), e2e.DefaultFleetConditionTimeout)
 
 	// get the Status of the fleetautoscaler
 	fas, err = framework.AgonesClient.AutoscalingV1().FleetAutoscalers(fas.ObjectMeta.Namespace).Get(ctx, fas.Name, metav1.GetOptions{})
@@ -234,7 +234,7 @@ func TestFleetAutoScalerRollingUpdate(t *testing.T) {
 	// check that we are able to scale
 	framework.WaitForFleetAutoScalerCondition(t, fas, func(log *logrus.Entry, fas *autoscalingv1.FleetAutoscaler) bool {
 		return !fas.Status.ScalingLimited
-	})
+	}, e2e.DefaultFleetAutoScalerConditionTimeout)
 
 	// Change ContainerPort to trigger creating a new GSSet
 	flt, err = framework.AgonesClient.AgonesV1().Fleets(framework.Namespace).Get(ctx, flt.ObjectMeta.Name, metav1.GetOptions{})
@@ -308,7 +308,7 @@ func TestAutoscalerStressCreate(t *testing.T) {
 		defer fleets.Delete(ctx, flt.ObjectMeta.Name, metav1.DeleteOptions{}) // nolint:errcheck
 	}
 
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 	r := rand.New(rand.NewSource(1783))
 
@@ -351,7 +351,7 @@ func TestAutoscalerStressCreate(t *testing.T) {
 					expectedReplicas = fas.Spec.Policy.Buffer.MaxReplicas
 				}
 				// the fleet autoscaler should scale the fleet now to expectedReplicas
-				framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(expectedReplicas))
+				framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(expectedReplicas), e2e.DefaultFleetConditionTimeout)
 			} else {
 				require.False(t, valid,
 					fmt.Sprintf("FleetAutoscaler NOT created even if the parameters are valid: %d %d %d (%s)",
@@ -440,7 +440,7 @@ func TestAutoscalerWebhook(t *testing.T) {
 	require.NoError(t, err)
 	defer fleets.Delete(ctx, flt.ObjectMeta.Name, metav1.DeleteOptions{}) // nolint:errcheck
 
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 	fleetautoscalers := framework.AgonesClient.AutoscalingV1().FleetAutoscalers(framework.Namespace)
 	fas := defaultFleetAutoscaler(flt, framework.Namespace)
@@ -462,7 +462,7 @@ func TestAutoscalerWebhook(t *testing.T) {
 	framework.AssertFleetCondition(t, flt, func(log *logrus.Entry, fleet *agonesv1.Fleet) bool {
 		log.WithField("fleetStatus", fmt.Sprintf("%+v", fleet.Status)).WithField("fleet", fleet.ObjectMeta.Name).Info("Awaiting fleet.Status.AllocatedReplicas == 1")
 		return fleet.Status.AllocatedReplicas == 1
-	})
+	}, e2e.DefaultFleetConditionTimeout)
 
 	framework.AssertFleetCondition(t, flt, func(log *logrus.Entry, fleet *agonesv1.Fleet) bool {
 		log.WithField("fleetStatus", fmt.Sprintf("%+v", fleet.Status)).
@@ -470,7 +470,7 @@ func TestAutoscalerWebhook(t *testing.T) {
 			WithField("initialReplicasCount", initialReplicasCount).
 			Info("Awaiting fleet.Status.Replicas > initialReplicasCount")
 		return fleet.Status.Replicas > initialReplicasCount
-	})
+	}, e2e.DefaultFleetConditionTimeout)
 
 	// Cause an error in Webhook config
 	// Use wrong service Path
@@ -671,7 +671,7 @@ func TestFleetAutoscalerTLSWebhook(t *testing.T) {
 		defer fleets.Delete(ctx, flt.ObjectMeta.Name, metav1.DeleteOptions{}) // nolint:errcheck
 	}
 
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 	fleetautoscalers := framework.AgonesClient.AutoscalingV1().FleetAutoscalers(defaultNS)
 	fas := defaultFleetAutoscaler(flt, defaultNS)
@@ -697,11 +697,11 @@ func TestFleetAutoscalerTLSWebhook(t *testing.T) {
 	framework.CreateAndApplyAllocation(t, flt)
 	framework.AssertFleetCondition(t, flt, func(log *logrus.Entry, fleet *agonesv1.Fleet) bool {
 		return fleet.Status.AllocatedReplicas == 1
-	})
+	}, e2e.DefaultFleetConditionTimeout)
 
 	framework.AssertFleetCondition(t, flt, func(log *logrus.Entry, fleet *agonesv1.Fleet) bool {
 		return fleet.Status.Replicas > initialReplicasCount
-	})
+	}, e2e.DefaultFleetConditionTimeout)
 }
 
 func defaultAutoscalerWebhook(namespace string) (*corev1.Pod, *corev1.Service) {

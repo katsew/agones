@@ -67,7 +67,7 @@ func TestFleetRequestsLimits(t *testing.T) {
 	if assert.NoError(t, err) {
 		defer client.Fleets(framework.Namespace).Delete(ctx, flt.ObjectMeta.Name, metav1.DeleteOptions{}) // nolint:errcheck
 	}
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 	newReplicas := int32(5)
 	patch := fmt.Sprintf(`[{ "op": "replace", "path": "/spec/template/spec/template/spec/containers/0/resources/requests/cpu", "value": "1000m"},
@@ -78,7 +78,7 @@ func TestFleetRequestsLimits(t *testing.T) {
 
 	// In bug scenario fleet was infinitely creating new GSSets (5 at a time), because 1000m CPU was changed to 1 CPU
 	// internally - thought as new wrong GSSet in a Fleet Controller
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(newReplicas))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(newReplicas), e2e.DefaultFleetConditionTimeout)
 }
 
 // TestFleetStrategyValidation reproduces an issue when we are trying
@@ -94,7 +94,7 @@ func TestFleetStrategyValidation(t *testing.T) {
 	if assert.Nil(t, err) {
 		defer client.Fleets(framework.Namespace).Delete(ctx, flt.ObjectMeta.Name, metav1.DeleteOptions{}) // nolint:errcheck
 	}
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 	flt, err = client.Fleets(framework.Namespace).Get(ctx, flt.ObjectMeta.GetName(), metav1.GetOptions{})
 	assert.NoError(t, err)
@@ -139,19 +139,19 @@ func TestFleetScaleUpAllocateEditAndScaleDownToZero(t *testing.T) {
 
 	assert.Equal(t, int32(1), flt.Spec.Replicas)
 
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 	// Scale up to 5 replicas
 	const targetScale = 5
 	flt = scaleFleetPatch(ctx, t, flt, targetScale)
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(targetScale))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(targetScale), e2e.DefaultFleetConditionTimeout)
 
 	// Allocate 1 replica
 	gsa := framework.CreateAndApplyAllocation(t, flt)
 
 	framework.AssertFleetCondition(t, flt, func(log *logrus.Entry, fleet *agonesv1.Fleet) bool {
 		return fleet.Status.AllocatedReplicas == 1
-	})
+	}, e2e.DefaultFleetConditionTimeout)
 
 	flt, err = client.Fleets(framework.Namespace).Get(ctx, flt.ObjectMeta.GetName(), metav1.GetOptions{})
 	assert.Nil(t, err)
@@ -191,28 +191,28 @@ func TestFleetScaleUpAllocateEditAndScaleDownToZero(t *testing.T) {
 	// RollingUpdate has happened due to changing Port, so waiting the complete of the RollingUpdate
 	framework.AssertFleetCondition(t, flt, func(log *logrus.Entry, fleet *agonesv1.Fleet) bool {
 		return fleet.Status.ReadyReplicas == 4
-	})
+	}, e2e.DefaultFleetConditionTimeout)
 
 	// Scale down to zero
 	const scaleDownTarget = 0
 	flt = scaleFleetPatch(ctx, t, flt, scaleDownTarget)
 	// Expect Replicas = 0, No GSS or GS
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(0))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(0), e2e.DefaultFleetConditionTimeout)
 
 	// Cleanup the allocated GameServer
 	gp := int64(1)
 	err = client.GameServers(framework.Namespace).Delete(ctx, gsa.Status.GameServerName, metav1.DeleteOptions{GracePeriodSeconds: &gp})
 	assert.Nil(t, err)
 
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(0))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(0), e2e.DefaultFleetConditionTimeout)
 
 	framework.AssertFleetCondition(t, flt, func(log *logrus.Entry, fleet *agonesv1.Fleet) bool {
 		return fleet.Status.AllocatedReplicas == 0
-	})
+	}, e2e.DefaultFleetConditionTimeout)
 
 	framework.AssertFleetCondition(t, flt, func(log *logrus.Entry, fleet *agonesv1.Fleet) bool {
 		return fleet.Status.Replicas == 0
-	})
+	}, e2e.DefaultFleetConditionTimeout)
 
 }
 
@@ -239,7 +239,7 @@ func TestFleetScaleUpEditAndScaleDown(t *testing.T) {
 
 			assert.Equal(t, int32(1), flt.Spec.Replicas)
 
-			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 			// scale up
 			const targetScale = 3
@@ -250,12 +250,12 @@ func TestFleetScaleUpEditAndScaleDown(t *testing.T) {
 				flt = scaleFleetSubresource(ctx, t, flt, targetScale)
 			}
 
-			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(targetScale))
+			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(targetScale), e2e.DefaultFleetConditionTimeout)
 			gsa := framework.CreateAndApplyAllocation(t, flt)
 
 			framework.AssertFleetCondition(t, flt, func(log *logrus.Entry, fleet *agonesv1.Fleet) bool {
 				return fleet.Status.AllocatedReplicas == 1
-			})
+			}, e2e.DefaultFleetConditionTimeout)
 
 			flt, err = client.Fleets(framework.Namespace).Get(ctx, flt.ObjectMeta.GetName(), metav1.GetOptions{})
 			assert.Nil(t, err)
@@ -294,18 +294,18 @@ func TestFleetScaleUpEditAndScaleDown(t *testing.T) {
 			} else {
 				flt = scaleFleetSubresource(ctx, t, flt, scaleDownTarget)
 			}
-			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(0))
+			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(0), e2e.DefaultFleetConditionTimeout)
 
 			// delete the allocated GameServer
 			gp := int64(1)
 			err = client.GameServers(framework.Namespace).Delete(ctx, gsa.Status.GameServerName, metav1.DeleteOptions{GracePeriodSeconds: &gp})
 			assert.Nil(t, err)
 
-			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(1))
+			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(1), e2e.DefaultFleetConditionTimeout)
 
 			framework.AssertFleetCondition(t, flt, func(log *logrus.Entry, fleet *agonesv1.Fleet) bool {
 				return fleet.Status.AllocatedReplicas == 0
-			})
+			}, e2e.DefaultFleetConditionTimeout)
 		})
 	}
 }
@@ -376,7 +376,7 @@ func TestFleetRollingUpdate(t *testing.T) {
 			assert.Equal(t, fixture.maxSurge, flt.Spec.Strategy.RollingUpdate.MaxSurge.StrVal)
 			assert.Equal(t, fixture.maxSurge, flt.Spec.Strategy.RollingUpdate.MaxUnavailable.StrVal)
 
-			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 			// scale up
 			const targetScale = 8
@@ -387,7 +387,7 @@ func TestFleetRollingUpdate(t *testing.T) {
 				flt = scaleFleetSubresource(ctx, t, flt, targetScale)
 			}
 
-			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(targetScale))
+			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(targetScale), e2e.DefaultFleetConditionTimeout)
 
 			flt, err = client.Fleets(framework.Namespace).Get(ctx, flt.ObjectMeta.GetName(), metav1.GetOptions{})
 			require.NoError(t, err)
@@ -405,7 +405,7 @@ func TestFleetRollingUpdate(t *testing.T) {
 				// before updating the fleet.
 				err = framework.WaitForFleetCondition(t, flt, func(entry *logrus.Entry, fleet *agonesv1.Fleet) bool {
 					return fleet.Status.ReadyReplicas < halfScale
-				})
+				}, e2e.DefaultFleetConditionTimeout)
 			}
 
 			// Change ContainerPort to trigger creating a new GSSet. Retry in case of a conflict.
@@ -490,11 +490,11 @@ func TestFleetRollingUpdate(t *testing.T) {
 				flt = scaleFleetSubresource(ctx, t, flt, scaleDownTarget)
 			}
 
-			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(1))
+			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(1), e2e.DefaultFleetConditionTimeout)
 
 			framework.AssertFleetCondition(t, flt, func(log *logrus.Entry, fleet *agonesv1.Fleet) bool {
 				return fleet.Status.AllocatedReplicas == 0
-			})
+			}, e2e.DefaultFleetConditionTimeout)
 		})
 	}
 }
@@ -514,7 +514,7 @@ func TestUpdateFleetReplicaAndSpec(t *testing.T) {
 	logrus.WithField("fleet", flt).Info("Created Fleet")
 
 	selector := labels.SelectorFromSet(labels.Set{agonesv1.FleetNameLabel: flt.ObjectMeta.Name})
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 	require.Eventuallyf(t, func() bool {
 		list, err := client.GameServerSets(framework.Namespace).List(ctx,
@@ -536,7 +536,7 @@ func TestUpdateFleetReplicaAndSpec(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, flt.Spec.Replicas)
 
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 	require.Eventuallyf(t, func() bool {
 		list, err := client.GameServerSets(framework.Namespace).List(ctx,
@@ -567,7 +567,7 @@ func TestScaleFleetUpAndDownWithGameServerAllocation(t *testing.T) {
 
 			assert.Equal(t, int32(1), flt.Spec.Replicas)
 
-			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 			// scale up
 			const targetScale = 3
@@ -578,7 +578,7 @@ func TestScaleFleetUpAndDownWithGameServerAllocation(t *testing.T) {
 				flt = scaleFleetSubresource(ctx, t, flt, targetScale)
 			}
 
-			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(targetScale))
+			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(targetScale), e2e.DefaultFleetConditionTimeout)
 
 			// get an allocation
 			gsa := &allocationv1.GameServerAllocation{ObjectMeta: metav1.ObjectMeta{GenerateName: "allocation-"},
@@ -591,7 +591,7 @@ func TestScaleFleetUpAndDownWithGameServerAllocation(t *testing.T) {
 			assert.Equal(t, allocationv1.GameServerAllocationAllocated, gsa.Status.State)
 			framework.AssertFleetCondition(t, flt, func(log *logrus.Entry, fleet *agonesv1.Fleet) bool {
 				return fleet.Status.AllocatedReplicas == 1
-			})
+			}, e2e.DefaultFleetConditionTimeout)
 
 			// scale down, with allocation
 			const scaleDownTarget = 1
@@ -601,17 +601,17 @@ func TestScaleFleetUpAndDownWithGameServerAllocation(t *testing.T) {
 				flt = scaleFleetSubresource(ctx, t, flt, scaleDownTarget)
 			}
 
-			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(0))
+			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(0), e2e.DefaultFleetConditionTimeout)
 
 			// delete the allocated GameServer
 			gp := int64(1)
 			err = client.GameServers(framework.Namespace).Delete(ctx, gsa.Status.GameServerName, metav1.DeleteOptions{GracePeriodSeconds: &gp})
 			assert.Nil(t, err)
-			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(1))
+			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(1), e2e.DefaultFleetConditionTimeout)
 
 			framework.AssertFleetCondition(t, flt, func(log *logrus.Entry, fleet *agonesv1.Fleet) bool {
 				return fleet.Status.AllocatedReplicas == 0
-			})
+			}, e2e.DefaultFleetConditionTimeout)
 		})
 	}
 }
@@ -649,7 +649,7 @@ func TestFleetUpdates(t *testing.T) {
 
 			err = framework.WaitForFleetGameServersCondition(flt, func(gs *agonesv1.GameServer) bool {
 				return gs.ObjectMeta.Annotations[key] == red
-			})
+			}, e2e.DefaultFleetGameServersConditionTimeout)
 			assert.Nil(t, err)
 
 			// if the generation has been updated, it's time to try again.
@@ -672,7 +672,7 @@ func TestFleetUpdates(t *testing.T) {
 
 			err = framework.WaitForFleetGameServersCondition(flt, func(gs *agonesv1.GameServer) bool {
 				return gs.ObjectMeta.Annotations[key] == green
-			})
+			}, e2e.DefaultFleetGameServersConditionTimeout)
 			assert.Nil(t, err)
 		})
 	}
@@ -699,7 +699,7 @@ func TestUpdateGameServerConfigurationInFleet(t *testing.T) {
 
 	assert.Equal(t, int32(replicasCount), flt.Spec.Replicas)
 
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 	// get an allocation
 	gsa := &allocationv1.GameServerAllocation{ObjectMeta: metav1.ObjectMeta{GenerateName: "allocation-"},
@@ -712,7 +712,7 @@ func TestUpdateGameServerConfigurationInFleet(t *testing.T) {
 	assert.Equal(t, allocationv1.GameServerAllocationAllocated, gsa.Status.State)
 	framework.AssertFleetCondition(t, flt, func(log *logrus.Entry, fleet *agonesv1.Fleet) bool {
 		return fleet.Status.AllocatedReplicas == 1
-	})
+	}, e2e.DefaultFleetConditionTimeout)
 
 	flt, err = framework.AgonesClient.AgonesV1().Fleets(framework.Namespace).Get(ctx, flt.Name, metav1.GetOptions{})
 	assert.Nil(t, err, "could not get fleet")
@@ -730,7 +730,7 @@ func TestUpdateGameServerConfigurationInFleet(t *testing.T) {
 		containerPort := gs.Spec.Ports[0].ContainerPort
 		return (gs.Name == gsa.Status.GameServerName && containerPort == oldPort) ||
 			(gs.Name != gsa.Status.GameServerName && containerPort == newPort)
-	})
+	}, e2e.DefaultFleetGameServersConditionTimeout)
 	assert.Nil(t, err, "gameservers don't have expected container port")
 }
 
@@ -747,7 +747,7 @@ func TestReservedGameServerInFleet(t *testing.T) {
 		defer client.Fleets(framework.Namespace).Delete(ctx, flt.ObjectMeta.Name, metav1.DeleteOptions{}) // nolint:errcheck
 	}
 
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 	gsList, err := framework.ListGameServersFromFleet(flt)
 	assert.NoError(t, err)
@@ -763,18 +763,18 @@ func TestReservedGameServerInFleet(t *testing.T) {
 	// make sure counts are correct
 	framework.AssertFleetCondition(t, flt, func(log *logrus.Entry, fleet *agonesv1.Fleet) bool {
 		return fleet.Status.ReadyReplicas == 2 && fleet.Status.ReservedReplicas == 1
-	})
+	}, e2e.DefaultFleetConditionTimeout)
 
 	// scale down to 0
 	flt = scaleFleetSubresource(ctx, t, flt, 0)
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(0))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(0), e2e.DefaultFleetConditionTimeout)
 
 	// one should be left behind
 	framework.AssertFleetCondition(t, flt, func(log *logrus.Entry, fleet *agonesv1.Fleet) bool {
 		result := fleet.Status.ReservedReplicas == 1
 		log.WithField("reserved", fleet.Status.ReservedReplicas).WithField("result", result).Info("waiting for 1 reserved replica")
 		return result
-	})
+	}, e2e.DefaultFleetConditionTimeout)
 
 	// check against gameservers directly too, just to be extra sure
 	err = wait.PollImmediate(2*time.Second, 5*time.Minute, func() (done bool, err error) {
@@ -910,7 +910,7 @@ func TestGameServerAllocationDuringGameServerDeletion(t *testing.T) {
 
 		assert.Equal(t, size, flt.Spec.Replicas)
 
-		framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+		framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 		var allocs []string
 
@@ -1026,14 +1026,14 @@ func TestCreateFleetAndUpdateScaleSubresource(t *testing.T) {
 		defer client.Fleets(framework.Namespace).Delete(ctx, flt.ObjectMeta.Name, metav1.DeleteOptions{}) // nolint:errcheck
 	}
 	assert.Equal(t, initialReplicas, flt.Spec.Replicas)
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 	newReplicas := initialReplicas * 2
 	scaleFleetSubresource(ctx, t, flt, newReplicas)
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(newReplicas))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(newReplicas), e2e.DefaultFleetConditionTimeout)
 
 	scaleFleetSubresource(ctx, t, flt, initialReplicas)
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(initialReplicas))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(initialReplicas), e2e.DefaultFleetConditionTimeout)
 }
 
 // TestScaleUpAndDownInParallelStressTest creates N fleets, half of which start with replicas=0
@@ -1094,9 +1094,9 @@ func TestScaleUpAndDownInParallelStressTest(t *testing.T) {
 	// wait for initial fleet conditions.
 	for fleetNumber, flt := range fleets {
 		if fleetNumber%2 == 0 {
-			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(fleetSize))
+			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(fleetSize), e2e.DefaultFleetConditionTimeout)
 		} else {
-			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(defaultReplicas))
+			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(defaultReplicas), e2e.DefaultFleetConditionTimeout)
 		}
 	}
 	errorsChan := make(chan error)
@@ -1179,11 +1179,11 @@ func TestUpdateFleetScheduling(t *testing.T) {
 			assert.Equal(t, int32(1), flt.Spec.Replicas)
 			assert.Equal(t, apis.Packed, flt.Spec.Scheduling)
 
-			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 			const targetScale = 2
 			flt = schedulingFleetPatch(ctx, t, flt, apis.Distributed, targetScale)
-			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(targetScale))
+			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(targetScale), e2e.DefaultFleetConditionTimeout)
 
 			assert.Equal(t, int32(targetScale), flt.Spec.Replicas)
 			assert.Equal(t, apis.Distributed, flt.Spec.Scheduling)
@@ -1192,7 +1192,7 @@ func TestUpdateFleetScheduling(t *testing.T) {
 				func(gsList []agonesv1.GameServer) bool {
 					return countFleetScheduling(gsList, apis.Distributed) == 1 &&
 						countFleetScheduling(gsList, apis.Packed) == 1
-				})
+				}, e2e.DefaultFleetGameServerListConditionTimeout)
 			assert.Nil(t, err)
 		})
 }
@@ -1258,7 +1258,7 @@ func TestFleetWithLongLabelsAnnotations(t *testing.T) {
 	if assert.Nil(t, err) {
 		defer client.Fleets(framework.Namespace).Delete(ctx, goodFlt.ObjectMeta.Name, metav1.DeleteOptions{}) // nolint:errcheck
 	}
-	err = framework.WaitForFleetCondition(t, goodFlt, e2e.FleetReadyCount(goodFlt.Spec.Replicas))
+	err = framework.WaitForFleetCondition(t, goodFlt, e2e.FleetReadyCount(goodFlt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 	assert.Nil(t, err)
 
 	// Verify validation on Update()
@@ -1355,7 +1355,7 @@ func TestFleetRecreateGameServers(t *testing.T) {
 				defer client.Fleets(framework.Namespace).Delete(ctx, flt.ObjectMeta.Name, metav1.DeleteOptions{}) // nolint:errcheck
 			}
 
-			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 
 			list, err := listGameServers(ctx, flt, client)
 			assert.NoError(t, err)
@@ -1379,7 +1379,7 @@ func TestFleetRecreateGameServers(t *testing.T) {
 				assert.NoError(t, err)
 			}
 
-			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+			framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 		})
 	}
 }
@@ -1480,7 +1480,7 @@ func TestFleetAggregatedPlayerStatus(t *testing.T) {
 
 		log.WithField("status", fleet.Status).Info("Checking Capacity")
 		return fleet.Status.Players.Capacity == 30
-	})
+	}, e2e.DefaultFleetConditionTimeout)
 
 	list, err := framework.ListGameServersFromFleet(flt)
 	assert.NoError(t, err)
@@ -1524,7 +1524,7 @@ func TestFleetAggregatedPlayerStatus(t *testing.T) {
 			WithField("totalPlayers", totalPlayers).Info("Checking Capacity")
 		// since UDP packets might fail, we might get an extra player, so we'll check for that.
 		return (fleet.Status.Players.Capacity == int64(totalCapacity)) && (fleet.Status.Players.Count >= int64(totalPlayers))
-	})
+	}, e2e.DefaultFleetConditionTimeout)
 }
 
 func assertCausesContainsString(t *testing.T, causes []metav1.StatusCause, expected string) {
@@ -1580,7 +1580,7 @@ func schedulingFleetPatch(ctx context.Context, t *testing.T, f *agonesv1.Fleet, 
 func scaleAndWait(ctx context.Context, t *testing.T, flt *agonesv1.Fleet, fleetSize int32) (duration time.Duration, err error) {
 	t0 := time.Now()
 	scaleFleetSubresource(ctx, t, flt, fleetSize)
-	err = framework.WaitForFleetCondition(t, flt, e2e.FleetReadyCount(fleetSize))
+	err = framework.WaitForFleetCondition(t, flt, e2e.FleetReadyCount(fleetSize), e2e.DefaultFleetConditionTimeout)
 	duration = time.Since(t0)
 	return
 }

@@ -81,7 +81,7 @@ func TestAllocatorWithDeprecatedRequired(t *testing.T) {
 	}
 	assert.NoError(t, err)
 
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 	request := &pb.AllocationRequest{
 		Namespace:                    framework.Namespace,
 		RequiredGameServerSelector:   &pb.GameServerSelector{MatchLabels: map[string]string{agonesv1.FleetNameLabel: flt.ObjectMeta.Name}},
@@ -177,7 +177,7 @@ func TestAllocatorWithSelectors(t *testing.T) {
 	}
 	assert.NoError(t, err)
 
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 	request := &pb.AllocationRequest{
 		Namespace:           framework.Namespace,
 		GameServerSelectors: []*pb.GameServerSelector{{MatchLabels: map[string]string{agonesv1.FleetNameLabel: flt.ObjectMeta.Name}}},
@@ -257,7 +257,7 @@ func TestRestAllocatorWithDeprecatedRequired(t *testing.T) {
 	if !assert.Nil(t, err) {
 		return
 	}
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 	request := &pb.AllocationRequest{
 		Namespace:                    framework.Namespace,
 		RequiredGameServerSelector:   &pb.GameServerSelector{MatchLabels: map[string]string{agonesv1.FleetNameLabel: flt.ObjectMeta.Name}},
@@ -321,7 +321,7 @@ func TestRestAllocatorWithSelectors(t *testing.T) {
 	if !assert.Nil(t, err) {
 		return
 	}
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 	request := &pb.AllocationRequest{
 		Namespace:           framework.Namespace,
 		GameServerSelectors: []*pb.GameServerSelector{{MatchLabels: map[string]string{agonesv1.FleetNameLabel: flt.ObjectMeta.Name}}},
@@ -427,7 +427,7 @@ func TestAllocatorCrossNamespace(t *testing.T) {
 	if !assert.Nil(t, err) {
 		return
 	}
-	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas))
+	framework.AssertFleetCondition(t, flt, e2e.FleetReadyCount(flt.Spec.Replicas), e2e.DefaultFleetConditionTimeout)
 	request := &pb.AllocationRequest{
 		Namespace: namespaceA,
 		// Enable multi-cluster setting
