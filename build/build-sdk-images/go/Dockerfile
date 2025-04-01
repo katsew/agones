@@ -14,8 +14,9 @@
 ARG BASE_IMAGE=agones-build-sdk-base:latest
 FROM $BASE_IMAGE
 
-RUN apt-get --allow-releaseinfo-change update && \
-    apt-get install -y wget jq && \
+RUN dpkg --add-architecture amd64 && \
+    apt-get --allow-releaseinfo-change update && \
+    apt-get install -y wget jq libc6:amd64 && \
     apt-get clean
 
 # install go

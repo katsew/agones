@@ -25,6 +25,7 @@ googleapis=/go/src/agones.dev/agones/proto/googleapis
 gatewaygrpc=/go/src/agones.dev/agones/proto/grpc-gateway
 
 export GO111MODULE=on
+export CC=x86_64-linux-gnu-gcc
 
 mkdir -p /go/src/
 cp -r /go/src/agones.dev/agones/vendor/* /go/src/
