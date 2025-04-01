@@ -55,6 +55,47 @@
       ],
       "default": "Packed"
     },
+    "AllocationRequestSpec": {
+      "type": "object",
+      "properties": {
+        "multiClusterSetting": {
+          "$ref": "#/definitions/allocationMultiClusterSetting"
+        },
+        "gameServerSelectors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/allocationGameServerSelector"
+          }
+        },
+        "scheduling": {
+          "$ref": "#/definitions/AllocationRequestSchedulingStrategy"
+        },
+        "metadata": {
+          "$ref": "#/definitions/allocationMetaPatch"
+        },
+        "priorities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/allocationPriority"
+          }
+        },
+        "counters": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/allocationCounterAction"
+          },
+          "description": "[Stage: Beta]\n[FeatureFlag:CountsAndLists]\nCounters and Lists provide a set of actions to perform\non Counters and Lists during allocation."
+        },
+        "lists": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/allocationListAction"
+          }
+        }
+      }
+    },
     "AllocationResponseCounterStatus": {
       "type": "object",
       "properties": {
@@ -144,9 +185,18 @@
     "allocationAllocationRequest": {
       "type": "object",
       "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "apiVersion": {
+          "type": "string"
+        },
         "namespace": {
           "type": "string",
           "title": "The k8s namespace that is hosting the targeted fleet of gameservers to be allocated"
+        },
+        "spec": {
+          "$ref": "#/definitions/AllocationRequestSpec"
         },
         "multiClusterSetting": {
           "$ref": "#/definitions/allocationMultiClusterSetting",

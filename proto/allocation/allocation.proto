@@ -41,8 +41,27 @@ service AllocationService {
 }
 
 message AllocationRequest {
+  string kind = 12;
+  string apiVersion = 13;
   // The k8s namespace that is hosting the targeted fleet of gameservers to be allocated
   string namespace = 1;
+
+  Spec spec = 14;
+
+  message Spec {
+    MultiClusterSetting multiClusterSetting = 1;
+    repeated GameServerSelector gameServerSelectors = 2;
+    SchedulingStrategy scheduling = 3;
+    MetaPatch metadata = 4;
+    repeated Priority priorities = 5;
+
+    // [Stage: Beta]
+    // [FeatureFlag:CountsAndLists]
+    // Counters and Lists provide a set of actions to perform
+    // on Counters and Lists during allocation.
+    map<string, CounterAction> counters = 6;
+    map<string, ListAction> lists = 7;
+  }
 
   // If specified, multi-cluster policies are applied. Otherwise, allocation will happen locally.
   MultiClusterSetting multiClusterSetting = 2;
